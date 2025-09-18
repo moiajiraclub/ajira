@@ -1,39 +1,289 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Memberss Form</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ajira Club Authentication</title>
+    <!-- Use Tailwind CSS for a modern, responsive design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to right bottom, #3b82f6, #60a5fa);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1f2937;
+        }
+        .auth-container {
+            max-width: 420px;
+            width: 100%;
+            background-color: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            outline: none;
+            transition: border-color 0.2s ease-in-out;
+        }
+        .form-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+        }
+    </style>
 </head>
 <body>
-  <h2>Add New Member</h2>
-  <form id="memberForm">
-    <label>Name:</label><br>
-    <input type="text" id="name" required><br><br>
-    <label>Email:</label><br>
-    <input type="email" id="email" required><br><br>
-    <button type="submit">Add Member</button>
-  </form>
 
-  <p id="response"></p>
+    <!-- Main Authentication Container -->
+    <div class="auth-container p-8 m-4">
 
-  <script>
-    const form = document.getElementById("memberForm");
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
+        <!-- Header -->
+        <h1 class="text-3xl font-bold text-center text-blue-600 mb-2">Ajira Club</h1>
+        <p class="text-center text-gray-500 mb-8" id="status-message"></p>
 
-      const name = document.getElementById("name").value;
-      const email = document.getElementById("email").value;
+        <!-- Login Form (Initially visible) -->
+        <div id="login-form-container" class="space-y-6">
+            <h2 class="text-2xl font-semibold text-center text-gray-700">Log In</h2>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="login-email" class="sr-only">Email</label>
+                    <input type="email" id="login-email" class="form-input" placeholder="Email address" required>
+                </div>
+                <div>
+                    <label for="login-password" class="sr-only">Password</label>
+                    <input type="password" id="login-password" class="form-input" placeholder="Password" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition duration-300 ease-in-out transform hover:scale-105">
+                    Log In
+                </button>
+            </form>
+            <p class="text-center text-sm text-gray-600">
+                Don't have an account?
+                <a href="#" id="show-signup" class="text-blue-600 hover:text-blue-700 font-semibold transition duration-300">Sign Up</a>
+            </p>
+        </div>
 
-      const response = await fetch("http://localhost:5000/add-member", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ name, email })
-      });
+        <!-- Sign Up Form (Initially hidden) -->
+        <div id="signup-form-container" class="space-y-6 hidden">
+            <h2 class="text-2xl font-semibold text-center text-gray-700">Sign Up</h2>
+            <form id="signup-form" class="space-y-4">
+                <div>
+                    <label for="signup-username" class="sr-only">Username</label>
+                    <input type="text" id="signup-username" class="form-input" placeholder="Username" required>
+                </div>
+                <div>
+                    <label for="signup-email" class="sr-only">Email</label>
+                    <input type="email" id="signup-email" class="form-input" placeholder="Email address" required>
+                </div>
+                <div>
+                    <label for="signup-password" class="sr-only">Password</label>
+                    <input type="password" id="signup-password" class="form-input" placeholder="Password" required>
+                </div>
+                <div>
+                    <label for="confirm-password" class="sr-only">Confirm Password</label>
+                    <input type="password" id="confirm-password" class="form-input" placeholder="Confirm password" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition duration-300 ease-in-out transform hover:scale-105">
+                    Create Account
+                </button>
+            </form>
+            <p class="text-center text-sm text-gray-600">
+                Already have an account?
+                <a href="#" id="show-login" class="text-blue-600 hover:text-blue-700 font-semibold transition duration-300">Log In</a>
+            </p>
+        </div>
+        
+        <!-- Dashboard (Initially hidden) -->
+        <div id="dashboard-container" class="space-y-6 hidden text-center">
+            <h2 class="text-2xl font-semibold text-gray-700">Welcome, <span id="user-display-name"></span>!</h2>
+            <p class="text-gray-600">You are successfully logged in to the Ajira Club.</p>
+            <p class="text-xs text-gray-400">Your User ID: <span id="user-id"></span></p>
+            <button id="logout-button" class="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-xl transition duration-300 ease-in-out transform hover:scale-105">
+                Log Out
+            </button>
+        </div>
 
-      const text = await response.text();
-      document.getElementById("response").innerText = text;
-    });
-  </script>
+    </div>
+
+    <!-- Firebase SDK Scripts -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Firebase Configuration (Manually set) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDmvTc1Vpd4ndDX1zpyq67MVuFFNMkt8YA",
+            authDomain: "ajira-club.firebaseapp.com",
+            projectId: "ajira-club",
+            storageBucket: "ajira-club.firebasestorage.app",
+            messagingSenderId: "1089850645017",
+            appId: "1:1089850645017:web:0bd42110eb091c0afb6888"
+        };
+
+        const projectId = firebaseConfig.projectId;
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- DOM Elements ---
+        const loginFormContainer = document.getElementById('login-form-container');
+        const signupFormContainer = document.getElementById('signup-form-container');
+        const dashboardContainer = document.getElementById('dashboard-container');
+        const statusMessage = document.getElementById('status-message');
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const logoutButton = document.getElementById('logout-button');
+        const showSignupLink = document.getElementById('show-signup');
+        const showLoginLink = document.getElementById('show-login');
+        const userDisplayName = document.getElementById('user-display-name');
+        const userIdSpan = document.getElementById('user-id');
+
+        // --- Authentication State Listener ---
+        // This listener fires whenever the user's login state changes.
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // User is signed in.
+                const userId = user.uid;
+                
+                // Show dashboard and hide auth forms
+                loginFormContainer.classList.add('hidden');
+                signupFormContainer.classList.add('hidden');
+                dashboardContainer.classList.remove('hidden');
+
+                // Display the user ID
+                userIdSpan.textContent = userId;
+
+                // Listen for changes to the user's profile in Firestore to get their username
+                const userProfileDocRef = doc(db, `/artifacts/${projectId}/users/${userId}/profile/user_data`);
+                onSnapshot(userProfileDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const userData = docSnap.data();
+                        userDisplayName.textContent = userData.username || 'User';
+                    } else {
+                        userDisplayName.textContent = 'User';
+                    }
+                }, (error) => {
+                    console.error("Error fetching user profile:", error);
+                    userDisplayName.textContent = 'User'; // Fallback
+                });
+                
+            } else {
+                // User is signed out.
+                dashboardContainer.classList.add('hidden');
+                loginFormContainer.classList.remove('hidden');
+            }
+        });
+
+        // --- Initial Authentication ---
+        // This signs a user in anonymously to make Firestore operations possible.
+        window.onload = async () => {
+            try {
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Error during initial authentication:", error);
+            }
+        };
+
+        // --- Toggle Forms ---
+        showSignupLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginFormContainer.classList.add('hidden');
+            signupFormContainer.classList.remove('hidden');
+            statusMessage.textContent = '';
+        });
+
+        showLoginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            signupFormContainer.classList.add('hidden');
+            loginFormContainer.classList.remove('hidden');
+            statusMessage.textContent = '';
+        });
+
+        // --- Handle User Sign Up ---
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            const username = document.getElementById('signup-username').value;
+
+            if (password !== confirmPassword) {
+                statusMessage.textContent = 'Passwords do not match!';
+                statusMessage.classList.add('text-red-500');
+                return;
+            }
+            if (password.length < 6) {
+                statusMessage.textContent = 'Password must be at least 6 characters long.';
+                statusMessage.classList.add('text-red-500');
+                return;
+            }
+
+            statusMessage.textContent = 'Creating account...';
+            statusMessage.classList.remove('text-red-500', 'text-green-500');
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                
+                // Save username to Firestore
+                const userProfileDocRef = doc(db, `/artifacts/${projectId}/users/${user.uid}/profile/user_data`);
+                await setDoc(userProfileDocRef, {
+                    username: username,
+                    email: email,
+                    createdAt: new Date()
+                });
+
+                statusMessage.textContent = 'Account created successfully! Logging in...';
+                statusMessage.classList.add('text-green-500');
+
+            } catch (error) {
+                console.error("Signup error:", error);
+                statusMessage.textContent = error.message;
+                statusMessage.classList.add('text-red-500');
+            }
+        });
+
+        // --- Handle User Login ---
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            statusMessage.textContent = 'Logging in...';
+            statusMessage.classList.remove('text-red-500', 'text-green-500');
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                statusMessage.textContent = 'Login successful!';
+                statusMessage.classList.add('text-green-500');
+
+            } catch (error) {
+                console.error("Login error:", error);
+                statusMessage.textContent = error.message;
+                statusMessage.classList.add('text-red-500');
+            }
+        });
+
+        // --- Handle User Logout ---
+        logoutButton.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                statusMessage.textContent = 'Logged out successfully.';
+                statusMessage.classList.add('text-gray-500');
+            } catch (error) {
+                console.error("Logout error:", error);
+                statusMessage.textContent = error.message;
+                statusMessage.classList.add('text-red-500');
+            }
+        });
+
+    </script>
 </body>
 </html>
