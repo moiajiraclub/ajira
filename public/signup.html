@@ -254,6 +254,10 @@
                 await signInWithEmailAndPassword(auth, email, password);
                 statusMessage.textContent = 'Login successful!';
                 statusMessage.classList.add('text-green-500');
+                
+                // --- ADDED REDIRECTION LOGIC ---
+                window.location.href = 'index.html';
+
             } catch (error) {
                 console.error("Login error:", error);
                 statusMessage.textContent = error.message;
