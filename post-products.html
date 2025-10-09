@@ -55,8 +55,8 @@
 
         <form id="productForm" class="space-y-6">
             <div>
-                <label for="productTitle" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                <input type="text" id="productTitle" class="form-input" placeholder="e.g., Joseph Njoroge" required>
+                <label for="productTitle" class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <input type="text" id="productTitle" class="form-input" placeholder="e.g., Web Development Services" required>
             </div>
             <div>
                 <label for="productDescription" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -93,8 +93,9 @@
                 <input type="text" id="price" class="form-input" placeholder="e.g., KES 500 or negotiable" required>
             </div>
             <div>
-                <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Contact </label>
-                <input type="contact" id="contact" class="form-input" placeholder="e.g., 0759xxxxxx" required>
+                <!-- ID changed from 'contact' to 'contactInfo' to match the JS variable -->
+                <label for="contactInfo" class="block text-sm font-medium text-gray-700 mb-1">Contact Info (Email or Phone)</label>
+                <input type="text" id="contactInfo" class="form-input" placeholder="e.g., 0759xxxxxx or example@email.com" required>
             </div>
             <div>
                 <label for="productImage" class="block text-sm font-medium text-gray-700 mb-1">Product Image (Optional)</label>
@@ -131,11 +132,16 @@
         const auth = getAuth(app);
         const storage = getStorage(app);
 
+        let userId = 'anonymous'; // Default to anonymous until auth is ready
+
         // Sign in anonymously to access the public data
         onAuthStateChanged(auth, async (user) => {
-            if (!user) {
+            if (user) {
+                userId = user.uid;
+            } else {
                 try {
-                    await signInAnonymously(auth);
+                    const userCredential = await signInAnonymously(auth);
+                    userId = userCredential.user.uid;
                 } catch (error) {
                     console.error("Anonymous sign-in failed:", error);
                 }
@@ -156,15 +162,31 @@
             const type = document.getElementById('productType').value;
             const category = document.getElementById('productCategory').value;
             const price = document.getElementById('price').value;
-            const contactEmail = document.getElementById('contactEmail').value;
+            // FIX: Reading the correct element ID 'contactInfo'
+            const contactInfo = document.getElementById('contactInfo').value; 
             const file = imageInput.files[0];
             
-            // Basic validation
-            if (!title || !description || !type || !category || !price || !contactEmail) {
-                statusMessage.textContent = 'Please fill in all fields.';
+            // Basic validation (updated to use contactInfo)
+            if (!title || !description || !type || !category || !price || !contactInfo) {
+                statusMessage.textContent = 'Please fill in all required fields.';
                 statusMessage.classList.remove('text-green-600');
                 statusMessage.classList.add('text-red-500');
                 return;
+            }
+
+            // Ensure userId is available before proceeding
+            if (userId === 'anonymous' && !auth.currentUser) {
+                statusMessage.textContent = 'User authentication is still loading. Please wait a moment and try again.';
+                statusMessage.classList.remove('text-green-600');
+                statusMessage.classList.add('text-red-500');
+                // Attempt a final sign-in just in case
+                try {
+                    const userCredential = await signInAnonymously(auth);
+                    userId = userCredential.user.uid;
+                } catch (error) {
+                    // Do nothing, proceed to use 'anonymous' if fail
+                }
+                if (userId === 'anonymous' && !auth.currentUser) return;
             }
 
             statusMessage.textContent = 'Posting your product...';
@@ -172,18 +194,16 @@
             statusMessage.classList.add('text-gray-600');
 
             try {
-                // Get the current user's ID
-                const userId = auth.currentUser ? auth.currentUser.uid : 'anonymous';
-                const appId = "ajira-club"; // This matches the path in your security rules
+                const appId = "ajira-club"; // Matches the path in your security rules
 
-                // First, create a new document with all the text data
+                // 1. Create a new document with all the text data
                 const productData = {
                     title: title,
                     description: description,
                     type: type,
                     category: category,
                     price: price,
-                    contactEmail: contactEmail,
+                    contactInfo: contactInfo, // Using contactInfo for the field name
                     userId: userId,
                     createdAt: new Date()
                 };
@@ -191,7 +211,7 @@
                 const productsCollectionRef = collection(db, `/artifacts/${appId}/public/data/products`);
                 const docRef = await addDoc(productsCollectionRef, productData);
                 
-                // If a file was selected, upload it to Firebase Storage
+                // 2. If a file was selected, upload it to Firebase Storage
                 if (file) {
                     const storageRef = ref(storage, `images/${docRef.id}/${file.name}`);
                     await uploadBytes(storageRef, file);
@@ -210,7 +230,10 @@
 
             } catch (e) {
                 console.error("Error adding document or uploading image: ", e);
-                statusMessage.textContent = 'Failed to post product. Please try again.';
+                // Log the current user info to help diagnose permission issues
+                console.log("Current Auth User ID:", auth.currentUser ? auth.currentUser.uid : 'No user');
+
+                statusMessage.textContent = 'Failed to post product. Check the console for "FirebaseError: Permission Denied".';
                 statusMessage.classList.remove('text-green-600');
                 statusMessage.classList.add('text-red-500');
             }
