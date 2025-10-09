@@ -55,9 +55,7 @@
 
         <form id="productForm" class="space-y-6">
             <div>
-                <!-- Change: Label changed from 'Title' to 'Name' -->
                 <label for="productTitle" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                <!-- Change: Placeholder updated for 'Name' -->
                 <input type="text" id="productTitle" class="form-input" placeholder="e.g., My Great Product or Service Name" required>
             </div>
             <div>
@@ -95,10 +93,9 @@
                 <input type="text" id="price" class="form-input" placeholder="e.g., KES 500 or negotiable" required>
             </div>
             <div>
-                <!-- Change: Label now says 'Phone Number' -->
-                <label for="contactInfo" class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                <!-- Change: Input type changed to 'tel' and placeholder updated -->
-                <input type="tel" id="contactInfo" class="form-input" placeholder="e.g., 0759xxxxxx" required>
+                <!-- ID changed to phoneNumber for clarity and to prevent variable/ID conflicts -->
+                <label for="phoneNumber" class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                <input type="tel" id="phoneNumber" class="form-input" placeholder="e.g., 0759xxxxxx" required>
             </div>
             <div>
                 <label for="productImage" class="block text-sm font-medium text-gray-700 mb-1">Product Image (Optional)</label>
@@ -165,12 +162,16 @@
             const type = document.getElementById('productType').value;
             const category = document.getElementById('productCategory').value;
             const price = document.getElementById('price').value;
-            // FIX: Reading the correct element ID 'contactInfo'
-            const contactInfo = document.getElementById('contactInfo').value; 
+            
+            // FIX: Reading the new element ID 'phoneNumber'
+            const phoneNumber = document.getElementById('phoneNumber').value; 
             const file = imageInput.files[0];
             
-            // Basic validation (updated to use contactInfo)
-            if (!title || !description || !type || !category || !price || !contactInfo) {
+            // IMPORTANT DEBUG: Log the value read from the input field
+            console.log("Value read from input field (Phone Number):", phoneNumber);
+            
+            // Basic validation
+            if (!title || !description || !type || !category || !price || !phoneNumber) {
                 statusMessage.textContent = 'Please fill in all required fields.';
                 statusMessage.classList.remove('text-green-600');
                 statusMessage.classList.add('text-red-500');
@@ -182,12 +183,12 @@
                 statusMessage.textContent = 'User authentication is still loading. Please wait a moment and try again.';
                 statusMessage.classList.remove('text-green-600');
                 statusMessage.classList.add('text-red-500');
-                // Attempt a final sign-in just in case
+                
                 try {
                     const userCredential = await signInAnonymously(auth);
                     userId = userCredential.user.uid;
                 } catch (error) {
-                    // Do nothing, proceed to use 'anonymous' if fail
+                    console.error("Failed to re-authenticate anonymously:", error);
                 }
                 if (userId === 'anonymous' && !auth.currentUser) return;
             }
@@ -206,7 +207,8 @@
                     type: type,
                     category: category,
                     price: price,
-                    contactInfo: contactInfo, // Using contactInfo for the field name
+                    // FIX: Using the correct variable (phoneNumber) and setting a descriptive key (contactPhone)
+                    contactPhone: phoneNumber, 
                     userId: userId,
                     createdAt: new Date()
                 };
@@ -233,7 +235,6 @@
 
             } catch (e) {
                 console.error("Error adding document or uploading image: ", e);
-                // Log the current user info to help diagnose permission issues
                 console.log("Current Auth User ID:", auth.currentUser ? auth.currentUser.uid : 'No user');
 
                 statusMessage.textContent = 'Failed to post product. Check the console for "FirebaseError: Permission Denied".';
