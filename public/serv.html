@@ -1,15 +1,28 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Browse Products & Services - Moi University Ajira Club</title>
-    <!-- Use Tailwind CSS for a modern, responsive design -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="homepage.css">
     <style>
         body {
             font-family: 'Inter', sans-serif;
+        }
+        /* Custom modal styles for confirmation */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
         }
     </style>
 </head>
@@ -20,7 +33,7 @@
             <h1 class="text-xl font-bold">Moi University Ajira Club</h1>
             <div class="space-x-4">
                 <a href="index.html" class="hover:text-green-400">Home</a>
-                <a href="post-products.html" class="bg-green-600 px-4 py-2 rounded-md hover:bg-green-700">Post New</a>
+                <a href="public/post-product.html" class="bg-green-600 px-4 py-2 rounded-md hover:bg-green-700">Post New</a>
             </div>
         </div>
     </nav>
@@ -92,13 +105,16 @@
         </div>
     </footer>
 
-    <!-- Firebase SDK Scripts -->
+    <!-- Firebase SDK Scripts and App Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, query, where, orderBy, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // Your web app's Firebase configuration
+        import { getFirestore, collection, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+
+        // Enable Firebase debug logging
+        setLogLevel('debug');
+
         const firebaseConfig = {
             apiKey: "AIzaSyDmvTc1Vpd4ndDX1zpyq67MVuFFNMkt8YA",
             authDomain: "ajira-club.firebaseapp.com",
@@ -139,17 +155,20 @@
         const fetchProducts = () => {
             const productsCollectionRef = collection(db, `/artifacts/ajira-club/public/data/products`);
             
+            // onSnapshot listener fetches data and keeps it up-to-date
             onSnapshot(productsCollectionRef, (querySnapshot) => {
                 const products = [];
                 querySnapshot.forEach((doc) => {
                     products.push({ id: doc.id, ...doc.data() });
                 });
+                
+                // Store all products and display the current filtered set
                 allProducts = products;
-                displayProducts(allProducts);
+                filterProducts(); // Re-apply current filters and search term
                 loadingSpinner.classList.add('hidden');
             }, (error) => {
                 console.error("Error fetching products:", error);
-                loadingSpinner.innerHTML = '<p class="text-red-500">Failed to load products. Please check your internet connection and Firebase rules.</p>';
+                loadingSpinner.innerHTML = '<p class="text-red-500">Failed to load products. Check console for Firebase connection errors.</p>';
             });
         };
 
@@ -161,12 +180,17 @@
             }
             productsToDisplay.forEach(product => {
                 const isOwner = currentUserId && product.userId === currentUserId;
+                
                 const deleteButton = isOwner ? 
                     `<button onclick="deleteProduct('${product.id}')" class="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition duration-300">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                           <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 11-2 0v6a1 1 0 112 0V8z" clip-rule="evenodd" />
                         </svg>
                     </button>` : '';
+
+                // Read the contactPhone field
+                const contactValue = product.contactPhone || 'N/A';
+                const contactLink = contactValue && contactValue !== 'N/A' ? `tel:${contactValue}` : '#'; 
 
                 const productCard = `
                     <div class="bg-white p-6 rounded-xl shadow-md transform hover:scale-105 transition duration-300 relative">
@@ -177,12 +201,12 @@
                             ${product.type}
                         </span>
                         <p class="text-gray-600 mt-2">${product.description}</p>
-                        ${product.imageUrl ? `<img src="${product.imageUrl}" alt="${product.title}" class="mt-4 rounded-md">` : ''}
+                        ${product.imageUrl ? `<img src="${product.imageUrl}" alt="${product.title}" class="mt-4 rounded-md h-40 object-cover w-full">` : ''}
                         <p class="text-gray-800 font-semibold mt-2">
                             Category: <span class="text-green-600">${product.category}</span>
                         </p>
                         <p class="text-gray-800 font-semibold mt-1">
-                            Contact: <a href="mailto:${product.contactEmail}" class="text-green-600 underline">${product.contactEmail}</a>
+                            Contact: <a href="${contactLink}" class="text-green-600 underline">${contactValue}</a>
                         </p>
                         <p class="text-gray-800 font-semibold mt-1">
                             Price: <span class="text-green-600">${product.price}</span>
@@ -194,19 +218,55 @@
         };
         
         window.deleteProduct = async (productId) => {
-            const confirmed = window.confirm("Are you sure you want to delete this product?");
-            if (!confirmed) {
-                return;
-            }
+            // Using a custom modal instead of window.confirm
+            const confirmationModal = document.createElement('div');
+            confirmationModal.className = 'modal-overlay';
+            confirmationModal.innerHTML = `
+                <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm mx-auto">
+                    <h3 class="text-lg font-bold mb-4 text-gray-800">Confirm Deletion</h3>
+                    <p class="text-gray-600">Are you sure you want to permanently delete this product? This cannot be undone.</p>
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button id="cancelDelete" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition">Cancel</button>
+                        <button id="confirmDelete" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">Delete</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(confirmationModal);
 
-            try {
-                const appId = "ajira-club";
-                const docRef = doc(db, `/artifacts/${appId}/public/data/products`, productId);
-                await deleteDoc(docRef);
-                console.log("Product successfully deleted!");
-            } catch (error) {
-                console.error("Error removing document: ", error);
-            }
+            return new Promise((resolve) => {
+                document.getElementById('cancelDelete').onclick = () => {
+                    document.body.removeChild(confirmationModal);
+                    resolve(false);
+                };
+                document.getElementById('confirmDelete').onclick = () => {
+                    document.body.removeChild(confirmationModal);
+                    resolve(true);
+                };
+            }).then(async confirmed => {
+                if (!confirmed) return;
+
+                try {
+                    const appId = "ajira-club";
+                    const docRef = doc(db, `/artifacts/${appId}/public/data/products`, productId);
+                    await deleteDoc(docRef);
+                    console.log("Product successfully deleted!");
+                    // The onSnapshot listener handles the UI update if successful
+                } catch (error) {
+                    // Check for common permission error
+                    console.error("Error removing document: ", error);
+                    
+                    const errorMessage = error.code === 'permission-denied'
+                        ? 'Deletion failed: You may not have permission. (Check Firestore Security Rules!)'
+                        : 'Failed to delete product. See console for details.';
+                        
+                    // Show error feedback to the user
+                    const errorBox = document.createElement('div');
+                    errorBox.className = 'fixed bottom-4 right-4 bg-red-600 text-white p-3 rounded-lg shadow-xl transition-opacity duration-300';
+                    errorBox.textContent = errorMessage;
+                    document.body.appendChild(errorBox);
+                    setTimeout(() => document.body.removeChild(errorBox), 5000);
+                }
+            });
         };
 
         window.filterProducts = () => {
@@ -217,9 +277,14 @@
             const filteredProducts = allProducts.filter(product => {
                 const matchesType = !selectedType || product.type === selectedType;
                 const matchesCategory = !selectedCategory || product.category === selectedCategory;
+                
+                // Also check against the new contact field (contactPhone)
+                const productContact = (product.contactPhone || '').toLowerCase(); 
+
                 const matchesSearch = !searchQuery || 
                                      product.title.toLowerCase().includes(searchQuery) || 
-                                     product.description.toLowerCase().includes(searchQuery);
+                                     product.description.toLowerCase().includes(searchQuery) ||
+                                     productContact.includes(searchQuery);
 
                 return matchesType && matchesCategory && matchesSearch;
             });
@@ -232,4 +297,3 @@
     </script>
 </body>
 </html>
-
