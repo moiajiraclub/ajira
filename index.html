@@ -21,6 +21,173 @@
     </script>
 
 </head>
+
+ <!-- Add this to your <head> just before </head> -->
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<!-- End Firebase SDKs -->
+
+<!-- ...rest of your existing head code... -->
+
+<!-- AjiraBot Chat Button & Modal (Add this just before </body>) -->
+<div id="ajira-bot-button" class="fixed bottom-6 right-6 z-50">
+    <button class="bg-green-700 text-white rounded-full shadow-lg p-4 flex items-center hover:bg-green-800 focus:outline-none">
+        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 16v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2h14a2 2 0 002-2z"></path>
+        </svg>
+        AjiraBot
+    </button>
+</div>
+
+<div id="ajira-bot-modal" class="fixed inset-0 z-50 flex items-end justify-end pointer-events-none">
+    <div class="w-full sm:w-96 bg-white rounded-lg shadow-2xl m-6 p-4 flex flex-col pointer-events-auto" style="display: none;">
+        <div class="flex justify-between items-center mb-2">
+            <h3 class="font-bold text-green-700 text-lg flex items-center">
+                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 16v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2h14a2 2 0 002-2z"></path>
+                </svg>
+                AjiraBot
+            </h3>
+            <button id="ajira-bot-close" class="text-gray-400 hover:text-gray-700 text-xl font-bold">&times;</button>
+        </div>
+        <div id="ajira-bot-chat" class="flex-1 overflow-y-auto mb-2 space-y-2 text-sm max-h-80">
+            <!-- Initial bot greeting -->
+        </div>
+        <form id="ajira-bot-form" class="flex gap-2 mt-2">
+            <input type="text" id="ajira-bot-input" class="flex-1 border border-gray-300 rounded px-2 py-1 focus:outline-none" placeholder="Type your message..." autocomplete="off"/>
+            <button type="submit" class="bg-green-700 text-white px-4 py-1 rounded hover:bg-green-800">Send</button>
+        </form>
+    </div>
+</div>
+
+<!-- Firebase Initialization and AjiraBot Logic -->
+<script>
+// Firebase config -- REPLACE with your Firebase project credentials!
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// AjiraBot UI logic
+const ajiraBotButton = document.getElementById('ajira-bot-button');
+const ajiraBotModal = document.getElementById('ajira-bot-modal').children[0];
+const ajiraBotModalWrapper = document.getElementById('ajira-bot-modal');
+const ajiraBotClose = document.getElementById('ajira-bot-close');
+const ajiraBotChat = document.getElementById('ajira-bot-chat');
+const ajiraBotForm = document.getElementById('ajira-bot-form');
+const ajiraBotInput = document.getElementById('ajira-bot-input');
+
+// Generate sessionId for each chat (could use Firebase Auth for real users)
+const sessionId = 'ajira_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+
+function showBotModal() {
+    ajiraBotModal.style.display = 'flex';
+    ajiraBotModalWrapper.style.pointerEvents = 'auto';
+    ajiraBotInput.focus();
+    if (ajiraBotChat.children.length === 0) {
+        ajiraBotAddMessage("bot", `👋 Hello! I’m <b>AjiraBot</b>. How can I help you today?<br>
+        <ul class='list-disc ml-4'><li>Digital Career Paths</li><li>CV Creation</li><li>Portfolio Building</li></ul>
+        Type your question or select a topic!`);
+        saveMessage("bot", "Hello! I’m AjiraBot. How can I help you today?", sessionId);
+    }
+}
+function hideBotModal() {
+    ajiraBotModal.style.display = 'none';
+    ajiraBotModalWrapper.style.pointerEvents = 'none';
+}
+// Open chat
+ajiraBotButton.addEventListener('click', showBotModal);
+// Close chat
+ajiraBotClose.addEventListener('click', hideBotModal);
+
+// Add message to chat UI
+function ajiraBotAddMessage(sender, text) {
+    const div = document.createElement('div');
+    div.className = sender === "bot" ? "bg-green-100 text-green-900 p-2 rounded-lg self-start" : "bg-gray-200 text-gray-800 p-2 rounded-lg self-end text-right";
+    div.innerHTML = text;
+    ajiraBotChat.appendChild(div);
+    ajiraBotChat.scrollTop = ajiraBotChat.scrollHeight;
+}
+
+// Save message to Firestore
+async function saveMessage(role, text, sessionId) {
+    try {
+        await db.collection('ajiraBotChats').add({
+            sessionId: sessionId,
+            sender: role,
+            message: text,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (err) {
+        console.error("Error saving message:", err);
+    }
+}
+
+// Simple bot logic (for demo; replace with Firebase Function for smarter replies)
+function ajiraBotRespond(msg) {
+    msg = msg.trim().toLowerCase();
+    if (msg.includes("career") || msg.includes("path")) {
+        return `🌐 <b>Digital Career Paths</b>:<br>
+        - Web Developer<br>
+        - Data Analyst<br>
+        - Digital Marketer<br>
+        - Graphic Designer<br>
+        - Virtual Assistant<br>
+        - Content Writer<br>
+        <a href="https://ajiradigital.go.ke/#/digital-careers" target="_blank" class="underline text-green-700">See more career options</a>`;
+    } else if (msg.includes("cv") || msg.includes("resume")) {
+        return `📝 <b>CV Creation Tips</b>:<br>
+        - Use a clean, professional format<br>
+        - Highlight your digital skills<br>
+        - Keep it concise (1-2 pages)<br>
+        - Include links to your portfolio or LinkedIn<br>
+        <a href="https://zety.com/" target="_blank" class="underline text-green-700">Try an online CV builder</a>`;
+    } else if (msg.includes("portfolio")) {
+        return `📁 <b>Portfolio Building Advice</b>:<br>
+        - Showcase your best work/projects<br>
+        - Use platforms like GitHub, Behance, or personal website<br>
+        - Include case studies or project details<br>
+        <a href="https://www.canva.com/portfolios/templates/" target="_blank" class="underline text-green-700">Portfolio templates on Canva</a>`;
+    } else if (msg === "" || msg === "hi" || msg === "hello") {
+        return `👋 Hi again! You can ask about:<br>
+        <ul class='list-disc ml-4'><li>Digital Career Paths</li><li>CV Creation</li><li>Portfolio Building</li></ul>`;
+    } else {
+        return `🤖 Sorry, I didn’t quite get that. Please ask about <b>career paths</b>, <b>CV creation</b>, or <b>portfolio building</b>.`;
+    }
+}
+
+// Handle chat input -- uses Firestore for persistence
+ajiraBotForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const msg = ajiraBotInput.value;
+    if (msg.trim()) {
+        ajiraBotAddMessage("user", msg);
+        await saveMessage("user", msg, sessionId);
+        ajiraBotInput.value = "";
+
+        // Get bot reply, save and display
+        const botReply = ajiraBotRespond(msg);
+        setTimeout(async () => {
+            ajiraBotAddMessage("bot", botReply);
+            await saveMessage("bot", botReply, sessionId);
+        }, 500);
+    }
+});
+
+// Optional: Close modal when clicking outside
+ajiraBotModalWrapper.addEventListener('click', function(e) {
+    if (e.target === ajiraBotModalWrapper) hideBotModal();
+});
+</script>
+<!-- End AjiraBot Section -->
 <body class="font-roboto bg-gray-0">
     <!-- Logo and Title -->
     <div class="flex flex-col sm:flex-row items-center justify-center p-4 space-y-2 sm:space-y-0 sm:space-x-4">
